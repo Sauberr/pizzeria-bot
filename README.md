@@ -62,7 +62,7 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 ### 👨‍💼 For Administrators
 * Advanced admin panel accessible via Telegram and Django Admin
 * CRUD operations for managing products, categories, and banners
-* **Promo code management** — create, edit, delete and toggle codes directly in the bot
+* Promo code management — create, edit, delete and toggle codes directly in the bot
 * Sales and activity statistics with detailed analytics
 * User management and order monitoring
 * Sending notifications and messages to users
