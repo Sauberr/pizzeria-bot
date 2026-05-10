@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,7 +27,7 @@ class EnvConfig(BaseSettings):
     ADMIN_LIST: str = Field(default="", alias="ADMIN_LIST")
 
     @property
-    def ADMIN_USER_LIST(self) -> List[int]:
+    def ADMIN_USER_LIST(self) -> list[int]:
         if not self.ADMIN_LIST:
             return []
         try:
