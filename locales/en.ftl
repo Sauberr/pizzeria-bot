@@ -138,6 +138,31 @@ cancel_order_btn = Cancel ❌
 user_agreement_btn = User agreement 📜
 order_canceled = Order canceled ❌
 
+# --- Promo Code ---
+promo_code_request =
+    🎟️ Do you have a promo code?
+    Enter it below or tap Skip.
+promo_skip_button = Skip ➡️
+promo_applied = ✅ Promo code applied! Discount: {$discount}%
+promo_not_found = ❌ Promo code not found. Check the code and try again.
+promo_inactive = ❌ This promo code is no longer active.
+promo_not_started = ❌ This promo code is not active yet.
+promo_expired = ❌ This promo code has expired.
+promo_limit_reached = ❌ This promo code has reached its usage limit.
+order_confirmation_with_promo =
+    <b>📋 Order Details</b>
+    <i>👤 Customer Information:</i>
+        • Name: <code>{$name}</code>
+        • Phone: <code>{$phone}</code>
+        • Address: <code>{$address}</code>
+    <i>🎟️ Promo Code Applied:</i>
+        • Code: <code>{$promo_code}</code>
+        • Discount: <b>-{$discount_percent}%</b>
+        • Original price: <s>{$original_amount}</s>
+        • Discount: -{$discount_amount}
+        • Total: <b>{$total_amount}</b>
+    <i>⬇️ Please select payment method below</i>
+
 # --- Payment ---
 select_payment_method = <b>💳 Select Payment Method:</b>
 pay_with_crypto_btn = Pay with {$crypto} 💳
@@ -235,6 +260,36 @@ payment_received_order_failed =
     ❌ <b>Payment received but order creation failed.</b>
     Please contact support.
 
+# --- Admin: Promo Codes ---
+admin_promo_codes = 🎟️ Promo Codes
+admin_promo_list_header = <b>🎟️ Promo Codes</b>
+admin_promo_legend =
+    ─────────────
+    🟢 Active  ⏳ Not started yet  💀 Expired  🔴 Disabled
+    ✏️ Edit  🗑️ Delete  ✅/❌ Toggle active
+admin_promo_empty = No promo codes yet. Click ➕ to add one.
+admin_promo_add_btn = ➕ Add Promo Code
+admin_promo_deleted = ✅ Promo code deleted.
+admin_promo_toggled = Status changed to {$status}
+admin_promo_not_found = ❌ Promo code not found.
+admin_promo_created = ✅ Promo code created successfully!
+admin_promo_updated = ✅ Promo code updated successfully!
+admin_promo_save_error = ❌ Failed to save promo code. Maybe this code already exists.
+admin_promo_edit_hint =
+    ✏️ Editing promo: <b>{$current}</b>
+    Send "." to keep the current value.
+    Enter new code:
+admin_promo_enter_code = Enter the promo code (e.g. SUMMER25):
+admin_promo_code_length_error = ❌ Code must be 2–50 characters. Try again:
+admin_promo_enter_discount = Enter discount percentage (0–100){$hint}:
+admin_promo_discount_error = ❌ Enter a number between 1 and 100. Try again:
+admin_promo_enter_valid_from = Enter start date DD.MM.YYYY{$hint}:
+admin_promo_enter_valid_until = Enter end date DD.MM.YYYY{$hint}:
+admin_promo_date_error = ❌ Invalid date. Use format DD.MM.YYYY (e.g. 31.12.2025):
+admin_promo_date_range_error = ❌ End date must be after start date. Enter start date again:
+admin_promo_enter_max_uses = Enter max uses (0 = unlimited){$hint}:
+admin_promo_max_uses_error = ❌ Enter a whole non-negative number. Try again:
+
 # --- Admin Panel ---
 admin_no_access = ❌ You do not have sufficient rights to access this feature.
 admin_kb_placeholder = What do you want to do?
@@ -305,6 +360,7 @@ admin_product_error = Error occurred. Try again or type 'cancel'
 # --- Group Management (Admin) ---
 messages_deleted = Deleted {$count} messages!
 invalid_clear_format = Invalid command format. Use: /clear or /clear <number>
+clear_error = Failed to delete messages. Check bot permissions.
 clear_admin_only = The command is only available to group administrators.
 bot_admin_required = Bot must be a group admin to delete messages
 clear_command_format = Invalid command format. Use: /clear <number>

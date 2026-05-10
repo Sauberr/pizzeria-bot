@@ -25,8 +25,6 @@ def add_to_cart(user_id: int, product_id: int) -> Optional[Cart]:
             return cart_item
     except TelegramUser.DoesNotExist:
         return None
-    except Cart.DoesNotExist:
-        return None
 
 
 @sync_to_async
@@ -38,20 +36,21 @@ def get_cart_items(user_id: int) -> list[Cart]:
 
 @sync_to_async
 def get_user_carts(user_id: int) -> list[Cart]:
-    user = TelegramUser.objects.get(user_id=user_id)
-    return list(Cart.objects.filter(user=user).select_related("product"))
+    try:
+        user = TelegramUser.objects.get(user_id=user_id)
+        return list(Cart.objects.filter(user=user).select_related("product"))
+    except TelegramUser.DoesNotExist:
+        return []
 
 
 @sync_to_async
 def delete_from_cart(user_id: int, product_id: int) -> None:
-    user = TelegramUser.objects.get(user_id=user_id)
-    Cart.objects.filter(user=user, product_id=product_id).delete()
+    Cart.objects.filter(user__user_id=user_id, product_id=product_id).delete()
 
 
 @sync_to_async
 def clear_cart(user_id: int) -> None:
-    user = TelegramUser.objects.get(user_id=user_id)
-    Cart.objects.filter(user=user).delete()
+    Cart.objects.filter(user__user_id=user_id).delete()
 
 
 @sync_to_async

@@ -6,8 +6,10 @@ from django.conf import settings
 from fluentogram import TranslatorRunner
 from parler.utils.context import switch_language
 
-from keybords.inline import (get_products_btns, get_user_cart,
-                             get_user_catalog_btns, get_user_main_btns)
+from keybords.inline.user_cart import get_user_cart
+from keybords.inline.user_catalog_btns import get_user_catalog_btns
+from keybords.inline.user_main_btns import get_user_main_btns
+from keybords.inline.products_btns import get_products_btns
 from queries.cart_queries import (add_to_cart, delete_from_cart,
                                   get_user_carts, reduce_product_in_cart)
 from queries.category_queries import get_categories
@@ -17,7 +19,7 @@ from utils.paginator import Paginator
 from utils.currency import  convert_currency, format_price
 
 
-async def main_menu(level: int, menu_name: str, i18n: TranslatorRunner) -> tuple:
+async def main_menu(level: int, menu_name: str, i18n: TranslatorRunner, user_language: str) -> tuple:
     image = await get_banner_image(menu_name, i18n)
     kbds = get_user_main_btns(level=level, i18n=i18n)
     return image, kbds
@@ -53,13 +55,16 @@ async def products(
     products = await get_products(category_id=category)
 
     paginator = Paginator(products, page)
-    product = paginator.get_page()[0]
+    page_items = paginator.get_page()
+    if not page_items:
+        raise ValueError(i18n.product_no_image())
+    product = page_items[0]
     with switch_language(product, user_language):
         converted_price, current_symbol = await convert_currency(
             product.price, user_language
         )
         formatted_price = format_price(converted_price, current_symbol)
-        if product.image:
+        if product.image and os.path.exists(product.image.path):
             image = InputMediaPhoto(
                 media=FSInputFile(product.image.path),
                 caption=i18n.product_details(
@@ -128,19 +133,19 @@ async def carts(
         cart_price = cart.quantity * converted_product_price
         formatted_cart_price = format_price(cart_price, currency_symbol)
 
-        total_price = 0
-        for c in carts:
-            converted_price, _ = await convert_currency(c.product.price, user_language)
-            total_price += c.quantity * converted_price
+        total_usd = sum(float(c.product.price) * c.quantity for c in carts)
+        total_price, _ = await convert_currency(total_usd, user_language)
         formatted_total_price = format_price(total_price, currency_symbol)
 
         if cart.product.image:
             image_path = os.path.join(settings.MEDIA_ROOT, str(cart.product.image))
             if os.path.exists(image_path):
+                with switch_language(cart.product, user_language):
+                    product_name = cart.product.name
                 image = InputMediaPhoto(
                     media=FSInputFile(image_path),
                     caption=i18n.cart_item_details(
-                        name=cart.product.name,
+                        name=product_name,
                         price=formatted_product_price,
                         quantity=cart.quantity,
                         cart_price=formatted_cart_price,
@@ -178,7 +183,7 @@ async def get_menu_content(
     user_language: str = "en",
 ):
     if level == 0:
-        return await main_menu(level, menu_name, i18n=i18n)
+        return await main_menu(level, menu_name, i18n=i18n, user_language=user_language)
     elif level == 1:
         return await catalog(level, menu_name, i18n=i18n, user_language=user_language)
     elif level == 2:

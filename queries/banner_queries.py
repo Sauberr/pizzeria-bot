@@ -22,10 +22,8 @@ def change_banner_image(name: str, image: str) -> Banner:
 
 @sync_to_async
 def get_banner(page: str, user_language: str = "en") -> Optional[Banner]:
-    try:
-        return Banner.objects.language(user_language).filter(name=page).first()
-    except Banner.DoesNotExist:
-        return Banner.objects.filter(name=page).first()
+    banner = Banner.objects.language(user_language).filter(name=page).first()
+    return banner or Banner.objects.filter(name=page).first()
 
 
 @sync_to_async

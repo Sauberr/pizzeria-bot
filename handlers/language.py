@@ -4,7 +4,9 @@ from fluentogram import TranslatorHub, TranslatorRunner
 
 from callbacks.callbacks import LanguageCallBack, MenuCallBack
 from handlers.start_cmd import start_cmd
-from keybords.inline import get_language_selection_keyboard
+from keybords.inline.language_selection_keyboard import (
+    get_language_selection_keyboard,
+)
 from queries.language_queries import set_user_language
 
 language_router = Router()
@@ -30,4 +32,4 @@ async def change_language(
     new_i18n = translator_hub.get_translator_by_locale(new_language)
 
     await callback.message.delete()
-    await start_cmd(callback.message, new_i18n)
+    await start_cmd(callback.message, new_i18n, new_language)

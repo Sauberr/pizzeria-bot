@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from parler.admin import TranslatableAdmin
 
 from .models import (AdminUser, Banner, CaptchaRecord, Cart, Category, Order,
-                     OrderItem, Product, TelegramUser)
+                     OrderItem, Product, PromoCode, TelegramUser)
 
 
 @admin.register(AdminUser)
@@ -109,12 +109,35 @@ class OrderAdmin(admin.ModelAdmin):
         "address",
         "phone",
         "status",
+        "promo_code",
+        "discount_amount",
         "created_at",
         "updated_at",
     )
     inlines = [OrderItemAdmin]
     search_fields = ("id", "name", "address", "phone", "status")
     list_filter = ("status", "created_at", "updated_at")
+    raw_id_fields = ("promo_code",)
+
+
+@admin.register(PromoCode)
+class PromoCodeAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "code",
+        "discount_percent",
+        "valid_from",
+        "valid_until",
+        "max_uses",
+        "current_uses",
+        "is_active",
+        "created_at",
+    )
+    search_fields = ("code",)
+    list_filter = ("is_active", "valid_from", "valid_until")
+    list_display_links = ("code",)
+    list_editable = ("is_active",)
+    readonly_fields = ("current_uses", "created_at", "updated_at")
 
 
 @admin.register(CaptchaRecord)

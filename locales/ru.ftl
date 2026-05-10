@@ -139,6 +139,31 @@ cancel_order_btn = Отменить ❌
 user_agreement_btn = Пользовательское соглашение 📜
 order_canceled = Заказ отменен ❌
 
+# --- Promo Code ---
+promo_code_request =
+    🎟️ У вас есть промокод?
+    Введите его ниже или нажмите «Пропустить».
+promo_skip_button = Пропустить ➡️
+promo_applied = ✅ Промокод применён! Скидка: {$discount}%
+promo_not_found = ❌ Промокод не найден. Проверьте код и попробуйте снова.
+promo_inactive = ❌ Этот промокод больше не активен.
+promo_not_started = ❌ Этот промокод ещё не начал действовать.
+promo_expired = ❌ Срок действия промокода истёк.
+promo_limit_reached = ❌ Промокод исчерпал лимит использований.
+order_confirmation_with_promo =
+    <b>📋 Детали заказа</b>
+    <i>👤 Информация о клиенте:</i>
+        • Имя: <code>{$name}</code>
+        • Телефон: <code>{$phone}</code>
+        • Адрес: <code>{$address}</code>
+    <i>🎟️ Применён промокод:</i>
+        • Код: <code>{$promo_code}</code>
+        • Скидка: <b>-{$discount_percent}%</b>
+        • Исходная цена: <s>{$original_amount}</s>
+        • Скидка: -{$discount_amount}
+        • Итого: <b>{$total_amount}</b>
+    <i>⬇️ Пожалуйста, выберите способ оплаты ниже</i>
+
 # --- Payment ---
 select_payment_method = <b>💳 Выберите способ оплаты:</b>
 pay_with_crypto_btn = Оплатить через {$crypto} 💳
@@ -203,6 +228,36 @@ order_detail_item =
 order_detail_total =
     -----------------------------------
     💰 <b>Общая стоимость: ${$total_sum}</b>
+
+# --- Admin: Promo Codes ---
+admin_promo_codes = 🎟️ Промокоды
+admin_promo_list_header = <b>🎟️ Промокоды</b>
+admin_promo_legend =
+    ─────────────
+    🟢 Активен  ⏳ Ещё не начался  💀 Истёк  🔴 Отключён
+    ✏️ Редакт.  🗑️ Удалить  ✅/❌ Вкл/Откл
+admin_promo_empty = Промокодов пока нет. Нажмите ➕ чтобы добавить.
+admin_promo_add_btn = ➕ Добавить промокод
+admin_promo_deleted = ✅ Промокод удалён.
+admin_promo_toggled = Статус изменён на {$status}
+admin_promo_not_found = ❌ Промокод не найден.
+admin_promo_created = ✅ Промокод успешно создан!
+admin_promo_updated = ✅ Промокод успешно обновлён!
+admin_promo_save_error = ❌ Не удалось сохранить. Возможно, такой код уже существует.
+admin_promo_edit_hint =
+    ✏️ Редактирование: <b>{$current}</b>
+    Отправьте "." чтобы сохранить текущее значение.
+    Введите новый код:
+admin_promo_enter_code = Введите промокод (например SUMMER25):
+admin_promo_code_length_error = ❌ Код должен быть от 2 до 50 символов. Попробуйте снова:
+admin_promo_enter_discount = Введите процент скидки (0–100){$hint}:
+admin_promo_discount_error = ❌ Введите число от 1 до 100. Попробуйте снова:
+admin_promo_enter_valid_from = Введите дату начала ДД.ММ.ГГГГ{$hint}:
+admin_promo_enter_valid_until = Введите дату окончания ДД.ММ.ГГГГ{$hint}:
+admin_promo_date_error = ❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ (например 31.12.2025):
+admin_promo_date_range_error = ❌ Дата окончания должна быть позже даты начала. Введите дату начала снова:
+admin_promo_enter_max_uses = Введите макс. число использований (0 = безлимит){$hint}:
+admin_promo_max_uses_error = ❌ Введите целое неотрицательное число. Попробуйте снова:
 
 # --- System Errors & Messages ---
 unrecognized_action = Нераспознанное действие.
@@ -301,6 +356,7 @@ admin_product_error = Произошла ошибка. Попробуйте сн
 # --- Group Management (Admin) ---
 messages_deleted = Удалено {$count} сообщений!
 invalid_clear_format = Неверный формат команды. Используйте: /clear или /clear <число>
+clear_error = Не удалось удалить сообщения. Проверьте права бота.
 clear_admin_only = Команда доступна только администраторам группы.
 bot_admin_required = Бот должен быть администратором группы для удаления сообщений
 clear_command_format = Неверный формат команды. Используйте: /clear <число>

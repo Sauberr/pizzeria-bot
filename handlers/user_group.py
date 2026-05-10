@@ -53,7 +53,7 @@ async def clear_group(message: types.Message, bot: Bot, i18n: TranslatorRunner) 
             return
 
         if num_to_delete < 1 or num_to_delete > 100:
-            await message.answer("Please specify a number between 1 and 100.")
+            await message.answer(i18n.invalid_clear_format())
             return
 
         message_ids_to_delete = [

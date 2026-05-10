@@ -2,27 +2,6 @@ version: "3.7"
 
 services:
 
-  django:
-    container_name: djangoproject
-    build:
-      context: .
-    ports:
-      - "8000:8000"
-    networks:
-      - botnet
-    restart: always
-    env_file:
-      - .env
-    depends_on:
-      - db
-    command: >
-      sh -c "python django_app.py migrate &&
-             python django_app.py createsuperuser --noinput || true &&
-              python django_app.py loaddata fixtures/categories.json &&
-             python django_app.py loaddata fixtures/products.json &&
-             python django_app.py loaddata fixtures/banners.json &&
-             python django_app.py runserver 0.0.0.0:8000"
-
   db:
     container_name: database
     image: postgres:15-alpine
@@ -35,7 +14,49 @@ services:
       - postgres_data:/var/lib/postgresql/data
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - botnet
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  django:
+    container_name: djangoproject
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    networks:
+      - botnet
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python django_app.py migrate &&
+             python django_app.py createsuperuser --noinput || true &&
+             python django_app.py loaddata fixtures/categories.json &&
+             python django_app.py loaddata fixtures/products.json &&
+             python django_app.py loaddata fixtures/banners.json &&
+             python django_app.py runserver 0.0.0.0:8000"
 
   tgbot:
     container_name: telegrambot
@@ -48,8 +69,12 @@ services:
       - .env
     command: python app.py
     depends_on:
-      - db
-      - django
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      django:
+        condition: service_started
 
 networks:
   botnet:
@@ -57,3 +82,4 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:

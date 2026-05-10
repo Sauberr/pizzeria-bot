@@ -62,6 +62,7 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 ### 👨‍💼 For Administrators
 * Advanced admin panel accessible via Telegram and Django Admin
 * CRUD operations for managing products, categories, and banners
+* **Promo code management** — create, edit, delete and toggle codes directly in the bot
 * Sales and activity statistics with detailed analytics
 * User management and order monitoring
 * Sending notifications and messages to users
@@ -71,6 +72,7 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 ### 👤 For Users
 * Intuitive catalog browsing with navigation and pagination
 * Payment via Telegram Pay and cryptocurrency payments
+* **Promo code support** — enter a code at checkout to get a percentage discount; the bot validates it and shows the original price, discount amount, and new total before payment
 * Easy order placement and order history viewing
 * User profile with personal information and preferences
 * Shopping cart functionality with quantity management
@@ -81,6 +83,8 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 
 ## 🛠️ Local Development
 
+**Requirements:** Python 3.12+, PostgreSQL, Redis
+
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/your-username/telegram-pizzeria-bot.git
@@ -89,10 +93,10 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 
 2. **Create and activate virtual environment:**
    ```bash
-   python3.12 -m venv ../venv
-   source ../venv/bin/activate
+   python3.12 -m venv .venv
+   source .venv/bin/activate
    ```
-   
+
 3. **Install dependencies:**
    ```bash
    pip install --upgrade pip
@@ -101,45 +105,63 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 
 4. **Configure environment variables:**
    ```bash
-   cp .env.example .env
+   cp example.env .env
    ```
-   
-   Open `.env` file and fill in all required environment variables:
-   
+
+   Open `.env` and fill in the required values. Key variables:
+
    ```env
-   # Bot Configuration
-   TOKEN=your_telegram_bot_token_here
-   
-   # Database Configuration
-   DB_PG=postgresql+asyncpg://username:password@localhost:5432/database_name
-   
-   # Payment Configuration
-   CRYPTO_TOKEN=your_crypto_payment_token_here
-   STAR_PAYMENT_TOKEN=your_star_payment_token_here
-   
-   # Other required variables...
+   TOKEN=your_telegram_bot_token
+   ADMIN_LIST=your_telegram_id
+
+   POSTGRES_NAME=telegrambot
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=postgres
+   POSTGRES_HOST=localhost
+   POSTGRES_PORT=5432
+
+   # Redis — for local run use localhost
+   REDIS_URL=redis://localhost:6379/0
+
+   CRYPTO_TOKEN=your_crypto_token
+   STAR_PAYMENT_TOKEN=your_star_token
+
+   DJANGO_SECRET_KEY=your-long-random-secret-key
+   DJANGO_SUPERUSER_USERNAME=admin
+   DJANGO_SUPERUSER_EMAIL=admin@example.com
+   DJANGO_SUPERUSER_PASSWORD=strongpassword
    ```
 
    **Where to get tokens:**
-   - **Telegram Bot Token**: Create a bot via [@BotFather](https://t.me/botfather)
-   - **Crypto Payment Token**: Get from your cryptocurrency payment provider
-   - **Star Payment Token**: Get from Telegram Bot API documentation
+   - **Telegram Bot Token** — [@BotFather](https://t.me/botfather)
+   - **Crypto Token** — [CryptoPay](https://t.me/CryptoBot)
 
-5. **Set up database:**
-   ```
-   For production: PostgreSQL
-   For local development: SQLite3
-   ```
-
-6. **Create Django superuser:**
+5. **Start Redis locally:**
    ```bash
-   cd src
-   python manage.py createsuperuser
+   # macOS
+   brew install redis && brew services start redis
+
+   # Ubuntu
+   sudo apt install redis-server && sudo systemctl start redis
+
+   # or via Docker
+   docker run -d -p 6379:6379 redis:7-alpine
    ```
 
-7. **Run the application:**
+6. **Apply migrations:**
+   ```bash
+   PYTHONPATH=. python django_project/telegrambot/manage.py migrate
+   ```
+
+7. **Run the bot:**
    ```bash
    python app.py
+   ```
+
+8. **Django Admin** (optional, in a separate terminal):
+   ```bash
+   PYTHONPATH=. python django_project/telegrambot/manage.py runserver
+   # open http://127.0.0.1:8000/admin
    ```
 
 ## 🐳 Docker Deployment

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Union
 
 from aiogram import Bot, Router, types
@@ -11,9 +12,11 @@ from fluentogram import TranslatorRunner
 from filters.chat_types import ChatTypeFilter
 from handlers.captcha import CaptchaManager
 from handlers.menu_processing import get_menu_content
-from keybords.inline import MenuCallBack
+from callbacks.callbacks import MenuCallBack
 from queries.banner_queries import get_banner
 from queries.cart_queries import add_to_cart
+
+logger = logging.getLogger(__name__)
 
 user_private_router = Router()
 user_private_router.message.filter(ChatTypeFilter(["private"]))
@@ -82,7 +85,7 @@ async def process_menu_command(
             user_id=user_id,
         )
 
-        banner = await get_banner(menu_name, user_language) if level == 0 else None
+        banner = await get_banner(menu_name) if level == 0 else None
         if banner and isinstance(content, types.InputMediaPhoto):
             content.caption = banner.description
 
@@ -95,7 +98,7 @@ async def process_menu_command(
                         text=content, reply_markup=keyboard, parse_mode="HTML"
                     )
             except TelegramBadRequest:
-                print("Failed to edit message, sending as new message instead.")
+                logger.warning("Failed to edit message, sending as new message instead.")
             finally:
                 await update.answer()
         else:

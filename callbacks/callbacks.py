@@ -15,3 +15,8 @@ class OrderDetailCallBack(CallbackData, prefix="order_detail"):
 
 class LanguageCallBack(CallbackData, prefix="lang"):
     language: str
+
+
+class PromoCallBack(CallbackData, prefix="promo"):
+    action: str
+    promo_id: int | None = None

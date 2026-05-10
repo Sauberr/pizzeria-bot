@@ -11,14 +11,16 @@ def mark_captcha_passed(user_id: int, selected_sticker: str) -> bool:
     try:
         with transaction.atomic():
             user = TelegramUser.objects.get_or_create(user_id=user_id)[0]
-            CaptchaRecord.objects.create(
+            CaptchaRecord.objects.update_or_create(
                 user=user,
-                captcha=selected_sticker,
-                timestamp=timezone.now(),
-                is_passed=True,
+                defaults={
+                    "captcha": selected_sticker,
+                    "timestamp": timezone.now(),
+                    "is_passed": True,
+                },
             )
             return True
-    except CaptchaRecord.DoesNotExist:
+    except Exception:
         return False
 
 

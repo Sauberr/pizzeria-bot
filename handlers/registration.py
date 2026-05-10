@@ -3,19 +3,19 @@ from typing import Union
 from aiogram import F, Router, types
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (CallbackQuery, InlineKeyboardButton,
-                           InlineKeyboardMarkup, Message, ReplyKeyboardRemove)
+from aiogram.types import (CallbackQuery, Message, ReplyKeyboardRemove)
 from django.utils import timezone
 from fluentogram import TranslatorRunner
 from phonenumbers import NumberParseException
 
-from app import CHANNEL_LINK
 from filters.chat_types import ChatTypeFilter
 from handlers.captcha import CaptchaManager
 from handlers.check_subscription import CheckSubscription
+from keybords.inline.subscription_keyboard import get_subscription_keyboard
 from handlers.start_cmd import start_cmd
-from keybords.inline import MenuCallBack, get_inline_back_button
-from keybords.reply import get_back_button
+from callbacks.callbacks import MenuCallBack
+from keybords.inline.inline_back_button import get_inline_back_button
+from keybords.reply.reply_back_button import get_reply_back_button
 from queries.captcha_queries import get_captcha_status
 from queries.order_queries import get_user_orders
 from queries.user_queries import create_telegram_user, get_user
@@ -30,7 +30,7 @@ registration_router.message.filter(ChatTypeFilter(["private"]))
 
 @registration_router.message(CommandStart())
 async def start_registration(
-    message: types.Message, state: FSMContext, i18n: TranslatorRunner
+    message: types.Message, state: FSMContext, i18n: TranslatorRunner, user_language: str = "en"
 ):
     user_id = message.from_user.id
 
@@ -40,7 +40,7 @@ async def start_registration(
 
     user = await get_user(user_id)
     if user and user.phone_number:
-        await start_cmd(message, i18n)
+        await start_cmd(message, i18n, user_language)
     else:
         await message.answer(i18n.first_name_request())
         await state.set_state(RegistrationStates.first_name)
@@ -58,14 +58,14 @@ async def process_first_name(
     await state.set_state(RegistrationStates.phone)
     await message.answer(
         i18n.phone_request(),
-        reply_markup=get_back_button(i18n=i18n),
+        reply_markup=get_reply_back_button(i18n=i18n),
         parse_mode="HTML",
     )
 
 
 @registration_router.message(StateFilter(RegistrationStates.phone))
 async def process_phone(
-    message: types.Message, state: FSMContext, i18n: TranslatorRunner
+    message: types.Message, state: FSMContext, i18n: TranslatorRunner, user_language: str = "en"
 ):
     if message.text == i18n.back_button():
         await state.set_state(RegistrationStates.first_name)
@@ -102,26 +102,11 @@ async def process_phone(
         )
 
         if await CheckSubscription.check_member_subscription(user_id):
-            await start_cmd(message, i18n)
+            await start_cmd(message, i18n, user_language)
         else:
-            kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=i18n.subscribe_to_channel_button(), url=CHANNEL_LINK
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text=i18n.check_subscription_button(),
-                            callback_data="check_subscription",
-                        )
-                    ],
-                ]
-            )
             await message.answer(
                 i18n.subscription_required(),
-                reply_markup=kb,
+                reply_markup=get_subscription_keyboard(i18n),
             )
 
     except NumberParseException:
@@ -135,7 +120,7 @@ async def process_phone(
 @registration_router.message(Command("profile"))
 @registration_router.callback_query(MenuCallBack.filter(F.menu_name == "profile"))
 async def process_profile_command(
-    update: Union[CallbackQuery, Message], i18n: TranslatorRunner
+    update: Union[CallbackQuery, Message], i18n: TranslatorRunner, user_language: str
 ):
     try:
         user_id = update.from_user.id
@@ -181,7 +166,7 @@ async def process_profile_command(
             await target.edit_media(media=media, reply_markup=keyboard)
             await update.answer()
         else:
-            keyboard = get_back_button(i18n=i18n)
+            keyboard = get_reply_back_button(i18n=i18n)
             await target.answer_photo(
                 photo=media.media, caption=media.caption, reply_markup=keyboard
             )

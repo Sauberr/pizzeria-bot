@@ -20,6 +20,8 @@ class I18nMiddleware(BaseMiddleware):
         user = None
         if event.message:
             user = event.message.from_user
+        elif event.edited_message:
+            user = event.edited_message.from_user
         elif event.callback_query:
             user = event.callback_query.from_user
         elif event.inline_query:

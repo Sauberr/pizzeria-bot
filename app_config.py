@@ -56,9 +56,14 @@ class DatabaseConfig(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: str = "5432"
 
-    DJANGO_SUPERUSER_USERNAME: str = "test"
-    DJANGO_SUPERUSER_EMAIL: str = "test@gmail.com"
-    DJANGO_SUPERUSER_PASSWORD: str = "test123!"
+    DJANGO_SECRET_KEY: str
+    DJANGO_DEBUG: bool = False
+
+    DJANGO_SUPERUSER_USERNAME: str
+    DJANGO_SUPERUSER_EMAIL: str
+    DJANGO_SUPERUSER_PASSWORD: str
+
+    REDIS_URL: str = "redis://localhost:6379/0"
 
 
 db_config = DatabaseConfig()

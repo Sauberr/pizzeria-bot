@@ -11,10 +11,10 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 from fluentogram import TranslatorRunner
 
-from app import CHANNEL_LINK
 from django_project.telegrambot.usersmanage.models import CaptchaRecord
 from filters.chat_types import ChatTypeFilter
 from handlers.check_subscription import CheckSubscription
+from keybords.inline.subscription_keyboard import get_subscription_keyboard
 from handlers.start_cmd import start_cmd
 from queries.captcha_queries import mark_captcha_passed
 from queries.user_queries import get_user
@@ -49,9 +49,9 @@ class CaptchaManager:
                 return False
 
             return await sync_to_async(
-                CaptchaRecord.objects.filter(
+                lambda: CaptchaRecord.objects.filter(
                     user=user, timestamp__gt=time_expiration
-                ).exists
+                ).exists()
             )()
         except CaptchaRecord.DoesNotExist:
             return False
@@ -113,7 +113,7 @@ class CaptchaManager:
 
 
 async def handle_successful_captcha(
-    callback: CallbackQuery, state: FSMContext, user_id: int, i18n: TranslatorRunner
+    callback: CallbackQuery, state: FSMContext, user_id: int, i18n: TranslatorRunner, user_language: str = "en"
 ) -> None:
     await callback.answer(i18n.captcha_success())
     await callback.message.delete()
@@ -124,26 +124,11 @@ async def handle_successful_captcha(
     user = await get_user(user_id)
     if user and user.phone_number:
         if await CheckSubscription.check_member_subscription(user_id):
-            await start_cmd(callback.message, i18n)
+            await start_cmd(callback.message, i18n, user_language)
         else:
-            kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=i18n.subscribe_to_channel_button(), url=CHANNEL_LINK
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text=i18n.check_subscription_button(),
-                            callback_data="check_subscription",
-                        )
-                    ],
-                ]
-            )
             await callback.message.answer(
                 i18n.subscription_required(),
-                reply_markup=kb,
+                reply_markup=get_subscription_keyboard(i18n),
             )
     else:
         await state.set_state(RegistrationStates.first_name)
@@ -155,36 +140,21 @@ async def handle_successful_captcha(
 
 
 @captcha_router.message(CommandStart())
-async def captcha_cmd(message: types.Message, i18n: TranslatorRunner):
+async def captcha_cmd(message: types.Message, i18n: TranslatorRunner, user_language: str = "en"):
     user_id = message.from_user.id
     user = await get_user(user_id)
 
-    if not user or user is None:
+    if not user:
         await message.answer(i18n.user_creation_error())
         return
 
     if await CaptchaManager.has_passed_recently(user_id):
         if await CheckSubscription.check_member_subscription(user_id):
-            await start_cmd(message, i18n)
+            await start_cmd(message, i18n, user_language)
         else:
-            kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=i18n.subscribe_to_channel_button(), url=CHANNEL_LINK
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text=i18n.check_subscription_button(),
-                            callback_data="check_subscription",
-                        )
-                    ],
-                ]
-            )
             await message.answer(
                 i18n.subscription_required(),
-                reply_markup=kb,
+                reply_markup=get_subscription_keyboard(i18n),
             )
     else:
         await CaptchaManager.send_new_captcha(message, user_id, i18n)
@@ -192,7 +162,7 @@ async def captcha_cmd(message: types.Message, i18n: TranslatorRunner):
 
 @captcha_router.callback_query(lambda c: c.data in EMOJI_LIST)
 async def process_captcha_callback(
-    callback: types.CallbackQuery, state: FSMContext, i18n: TranslatorRunner
+    callback: types.CallbackQuery, state: FSMContext, i18n: TranslatorRunner, user_language: str = "en"
 ):
     user_id = callback.from_user.id
     selected_emoji = callback.data
@@ -206,7 +176,7 @@ async def process_captcha_callback(
     if selected_emoji == correct_emoji:
         try:
             if await mark_captcha_passed(user_id, selected_emoji):
-                await handle_successful_captcha(callback, state, user_id, i18n)
+                await handle_successful_captcha(callback, state, user_id, i18n, user_language)
             else:
                 await callback.answer(i18n.captcha_save_error())
         except CaptchaRecord.DoesNotExist:

@@ -8,6 +8,7 @@ from aiocryptopay import AioCryptoPay, Networks
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.redis import RedisStorage
 from dotenv import load_dotenv
 
 
@@ -21,7 +22,7 @@ def setup_django():
 
 setup_django()
 
-from app_config import env_config
+from app_config import db_config, env_config
 from localization import setup_localization
 from middlewares.I18n import I18nMiddleware
 
@@ -38,7 +39,8 @@ bot.my_admins_list: list[int] = env_config.ADMIN_USER_LIST
 CHANNEL_ID: str = env_config.CHANNEL_ID
 CHANNEL_LINK: str = env_config.CHANNEL_LINK
 
-dp = Dispatcher()
+storage = RedisStorage.from_url(db_config.REDIS_URL)
+dp = Dispatcher(storage=storage)
 
 
 async def on_startup(bot):
@@ -69,7 +71,7 @@ async def on_startup(bot):
 
 
 async def on_shutdown(bot):
-    print("\033[31mBot stopped!")
+    logging.getLogger(__name__).info("Bot stopped.")
 
 
 async def main() -> None:

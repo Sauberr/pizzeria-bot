@@ -1,5 +1,7 @@
 from typing import Optional
+
 from asgiref.sync import sync_to_async
+from django.db.models import Count
 from django_project.telegrambot.usersmanage.models import Category, Product
 
 
@@ -98,8 +100,7 @@ def total_products() -> int:
 
 @sync_to_async
 def total_products_by_category() -> dict[str, int]:
-    categories = Category.objects.all()
-    category_stats = {}
-    for category in categories:
-        category_stats[category.name] = Product.objects.filter(category_id=category.id).count()
-    return category_stats
+    return {
+        cat.name: cat.product_count
+        for cat in Category.objects.annotate(product_count=Count("products"))
+    }

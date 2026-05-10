@@ -1,7 +1,10 @@
 import asyncio
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Union
+
+from parler.utils.context import switch_language
 
 from aiogram import F, Router, types
 from aiogram.filters import Command
@@ -12,21 +15,30 @@ from aiogram.types import (CallbackQuery, InlineKeyboardButton,
 from fluentogram import TranslatorRunner
 
 from app import crypto_client
-from callbacks.callbacks import OrderDetailCallBack
+from callbacks.callbacks import OrderDetailCallBack, MenuCallBack
 from filters.chat_types import ChatTypeFilter
 from handlers.payment import CryptoApiManager
-from keybords.inline import (MenuCallBack, get_order_details_keyboard,
-                             get_select_payment_keyboard, get_user_main_btns)
-from keybords.reply import get_back_button
+from keybords.inline.crypto_payment_keyboard import get_crypto_payment_keyboard
+from keybords.inline.order_confirmation_keyboard import get_order_confirmation_keyboard
+from keybords.inline.order_details_keyboard import get_order_details_keyboard
+from keybords.inline.select_payment_keyboard import get_select_payment_keyboard
+from keybords.inline.star_payment_keyboard import get_star_payment_keyboard
+from keybords.inline.user_main_btns import get_user_main_btns
+
+from keybords.reply.promo_keyboard import get_promo_keyboard
+from keybords.reply.reply_back_button import get_reply_back_button
 from queries.banner_queries import get_banner
 from queries.cart_queries import clear_cart, get_cart_items
 from queries.order_queries import (add_order_with_items, get_order_by_id,
                                    get_order_items, get_order_status,
                                    get_user_orders)
+from queries.promo_queries import validate_promo_code
 from states.order_state import OrderState
 from utils.get_banner_image import get_banner_image
 from utils.currency import convert_currency, format_price
 from utils.phone_formatting import format_phone_number
+
+logger = logging.getLogger(__name__)
 
 order_router = Router()
 order_router.message.filter(ChatTypeFilter(["private"]))
@@ -50,7 +62,7 @@ async def process_name(
         return
     await state.update_data(name=message.text)
     await message.answer(
-        i18n.phone_request_order(), reply_markup=get_back_button(i18n=i18n)
+        i18n.phone_request_order(), reply_markup=get_reply_back_button(i18n=i18n)
     )
     await state.set_state(OrderState.phone)
 
@@ -74,7 +86,7 @@ async def process_phone(
     await state.update_data(phone=formatted_phone)
     await message.answer(
         i18n.phone_accepted_address_request(),
-        reply_markup=get_back_button(i18n=i18n),
+        reply_markup=get_reply_back_button(i18n=i18n),
     )
     await state.set_state(OrderState.address)
 
@@ -84,11 +96,10 @@ async def process_address(
     message: types.Message,
     state: FSMContext,
     i18n: TranslatorRunner,
-    user_language: str,
 ):
     if message.text == i18n.back_button():
         await message.answer(
-            i18n.phone_request_again(), reply_markup=get_back_button(i18n=i18n)
+            i18n.phone_request_again(), reply_markup=get_reply_back_button(i18n=i18n)
         )
         await state.set_state(OrderState.phone)
         return
@@ -98,43 +109,106 @@ async def process_address(
         return
 
     await state.update_data(address=message.text)
+    await message.answer(
+        i18n.promo_code_request(),
+        reply_markup=get_promo_keyboard(i18n),
+    )
+    await state.set_state(OrderState.promo_code)
+
+
+async def _show_order_confirmation(
+    message: types.Message,
+    state: FSMContext,
+    i18n: TranslatorRunner,
+    user_language: str,
+) -> None:
     user_data = await state.get_data()
-
     cart_items = await get_cart_items(message.from_user.id)
-    total_amount_usd = sum(
-        float(item.product.price) * item.quantity for item in cart_items
+    total_usd = sum(float(item.product.price) * item.quantity for item in cart_items)
+
+    discount_percent = user_data.get("discount_percent", 0)
+    promo_code_str = user_data.get("promo_code_str")
+
+    if discount_percent:
+        discount_usd = total_usd * discount_percent / 100
+        discounted_usd = total_usd - discount_usd
+    else:
+        discount_usd = 0.0
+        discounted_usd = total_usd
+
+    total_amount, currency = await convert_currency(discounted_usd, user_language)
+    await state.update_data(
+        amount_usd=discounted_usd,
+        discount_amount_usd=discount_usd,
     )
 
-    total_amount, currency = await convert_currency(total_amount_usd, user_language)
+    keyboard = get_order_confirmation_keyboard(i18n)
 
-    confirmation_message = i18n.order_confirmation(
-        name=user_data["name"],
-        phone=user_data["phone"],
-        address=user_data["address"],
-        total_amount=format_price(total_amount, currency),
-    )
+    if discount_percent:
+        original_amount, _ = await convert_currency(total_usd, user_language)
+        discount_display, _ = await convert_currency(discount_usd, user_language)
+        msg = i18n.order_confirmation_with_promo(
+            name=user_data["name"],
+            phone=user_data["phone"],
+            address=user_data["address"],
+            promo_code=promo_code_str,
+            discount_percent=int(discount_percent),
+            original_amount=format_price(original_amount, currency),
+            discount_amount=format_price(discount_display, currency),
+            total_amount=format_price(total_amount, currency),
+        )
+    else:
+        msg = i18n.order_confirmation(
+            name=user_data["name"],
+            phone=user_data["phone"],
+            address=user_data["address"],
+            total_amount=format_price(total_amount, currency),
+        )
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=i18n.select_payment_btn(), callback_data="select_payment"
-                ),
-                InlineKeyboardButton(
-                    text=i18n.cancel_order_btn(), callback_data="cancel_order"
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text=i18n.user_agreement_btn(), url=os.getenv("USER_AGREEMENT")
-                )
-            ],
-        ]
-    )
-
-    await message.answer(confirmation_message, reply_markup=keyboard, parse_mode="HTML")
-    await state.update_data(amount_usd=float(total_amount_usd))
+    await message.answer(msg, reply_markup=keyboard, parse_mode="HTML")
     await state.set_state(OrderState.payment)
+
+
+@order_router.message(OrderState.promo_code, F.text)
+async def process_promo_code(
+    message: types.Message,
+    state: FSMContext,
+    i18n: TranslatorRunner,
+    user_language: str,
+):
+    if message.text == i18n.back_button():
+        await message.answer(
+            i18n.address_request_again(), reply_markup=get_reply_back_button(i18n=i18n)
+        )
+        await state.set_state(OrderState.address)
+        return
+
+    if message.text == i18n.promo_skip_button():
+        await _show_order_confirmation(message, state, i18n, user_language)
+        return
+
+    code = message.text.strip().upper()
+    promo, error = await validate_promo_code(code)
+
+    error_messages = {
+        "not_found": i18n.promo_not_found(),
+        "inactive": i18n.promo_inactive(),
+        "not_started": i18n.promo_not_started(),
+        "expired": i18n.promo_expired(),
+        "limit_reached": i18n.promo_limit_reached(),
+    }
+
+    if error:
+        await message.answer(error_messages[error])
+        return
+
+    await state.update_data(
+        promo_code_id=promo.id,
+        promo_code_str=promo.code,
+        discount_percent=float(promo.discount_percent),
+    )
+    await message.answer(i18n.promo_applied(discount=int(promo.discount_percent)))
+    await _show_order_confirmation(message, state, i18n, user_language)
 
 
 @order_router.callback_query(F.data.startswith("select_payment"))
@@ -208,21 +282,7 @@ async def process_crypto_payment(
             await callback.answer(i18n.payment_data_save_error(), show_alert=True)
             return
 
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=i18n.pay_with_crypto_btn(crypto=crypto),
-                        url=invoice.bot_invoice_url,
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=i18n.cancel_order_btn(), callback_data="cancel_order"
-                    )
-                ],
-            ]
-        )
+        keyboard = get_crypto_payment_keyboard(crypto, invoice.bot_invoice_url, i18n)
 
         if crypto == "USDT":
             crypto_format = f"{crypto_amount:.2f}"
@@ -246,7 +306,7 @@ async def process_crypto_payment(
             await callback.answer(i18n.payment_details_display_error(), show_alert=True)
             return
 
-        asyncio.create_task(
+        task = asyncio.create_task(
             check_payment(
                 invoice.invoice_id,
                 callback.from_user.id,
@@ -257,7 +317,13 @@ async def process_crypto_payment(
                 user_data,
                 i18n,
                 user_language,
+                expiration_time,
             )
+        )
+        task.add_done_callback(
+            lambda t: logger.error("Payment check task failed: %s", t.exception())
+            if t.exception()
+            else None
         )
 
     except Exception:
@@ -276,21 +342,7 @@ async def handle_star_payment(
         star_rate = 0.0187
         stars_amount = int(float(amount_usd) / star_rate)
 
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=i18n.pay_with_stars_btn(stars_amount=stars_amount),
-                        pay=True,
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=i18n.cancel_order_btn(), callback_data="cancel_order"
-                    )
-                ],
-            ]
-        )
+        kb = get_star_payment_keyboard(stars_amount, i18n)
 
         prices = [LabeledPrice(label="XTR", amount=stars_amount)]
         expiration_time = datetime.now() + timedelta(minutes=3)
@@ -323,9 +375,8 @@ async def check_payment(
     user_data,
     i18n: TranslatorRunner,
     user_language: str,
+    expiration_time: datetime,
 ):
-    expiration_time = datetime.now() + timedelta(minutes=3)
-
     while datetime.now() < expiration_time:
         try:
             invoices = await crypto_client.get_invoices(invoice_ids=[invoice_id])
@@ -339,6 +390,8 @@ async def check_payment(
                         address=user_data["address"],
                         status="completed",
                         cart_items=cart_items,
+                        promo_code_id=user_data.get("promo_code_id"),
+                        discount_amount=user_data.get("discount_amount_usd", 0),
                     )
                     await clear_cart(user_id)
                     order_status = await get_order_status(order.id)
@@ -359,11 +412,9 @@ async def check_payment(
 
                     main_menu_keyboard = get_user_main_btns(level=1, i18n=i18n)
 
-                    temp_msg = await bot.send_message(
-                        user_id, "...", reply_markup=ReplyKeyboardRemove()
+                    await bot.send_message(
+                        user_id, "✅", reply_markup=ReplyKeyboardRemove()
                     )
-                    await bot.delete_message(user_id, temp_msg.message_id)
-
                     await bot.send_message(
                         user_id,
                         success_message,
@@ -453,7 +504,7 @@ async def process_orders_command(
         user_id = update.from_user.id
         target = update.message if isinstance(update, CallbackQuery) else update
 
-        banner = await get_banner("orders", user_language)
+        banner = await get_banner("orders")
         orders = await get_user_orders(user_id)
 
         if not orders:
@@ -533,14 +584,14 @@ async def process_order_detail(
 
         item_details_list = []
         for item in items:
-            item_price_usd = float(item.price)
+            with switch_language(item.product, user_language):
+                item_name = item.product.name
             item_price, item_currency = await convert_currency(
-                item_price_usd, user_language
+                float(item.price), user_language
             )
-
             item_details_list.append(
                 i18n.order_detail_item(
-                    name=item.product.name,
+                    name=item_name,
                     quantity=int(item.quantity),
                     price=format_price(item_price, item_currency),
                 )

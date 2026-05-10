@@ -5,7 +5,6 @@ from phonenumbers.phonenumberutil import NumberParseException
 
 def format_phone_number(phone: str) -> str | None:
     try:
-
         phone_number = parse(phone, "UA")
         if not is_valid_number(phone_number):
             return None

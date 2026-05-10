@@ -1,15 +1,21 @@
+from decimal import Decimal
+
 from asgiref.sync import sync_to_async
-from django.db import transaction
+from django.db import transaction, models as db_models
 
 from django_project.telegrambot.usersmanage.models import (Cart, Order,
                                                            OrderItem,
+                                                           PromoCode,
                                                            TelegramUser)
 
 
 @sync_to_async
 def get_user_orders(user_id: int) -> list[Order]:
-    user = TelegramUser.objects.get(user_id=user_id)
-    return list(Order.objects.filter(user=user).order_by("-created_at"))
+    try:
+        user = TelegramUser.objects.get(user_id=user_id)
+        return list(Order.objects.filter(user=user).order_by("-created_at"))
+    except TelegramUser.DoesNotExist:
+        return []
 
 
 @sync_to_async
@@ -34,29 +40,43 @@ def add_order_with_items(
     address: str,
     status: str,
     cart_items: list[Cart],
+    promo_code_id: int | None = None,
+    discount_amount: float = 0,
 ) -> Order:
-    user = TelegramUser.objects.get(user_id=user_id)
-    try:
-        with transaction.atomic():
-            order = Order.objects.create(
-                user=user, name=name, phone=phone, address=address, status=status
+    with transaction.atomic():
+        user = TelegramUser.objects.get(user_id=user_id)
+
+        promo = None
+        if promo_code_id:
+            promo = PromoCode.objects.select_for_update().get(id=promo_code_id)
+
+        order = Order.objects.create(
+            user=user,
+            name=name,
+            phone=phone,
+            address=address,
+            status=status,
+            promo_code=promo,
+            discount_amount=Decimal(str(discount_amount)),
+        )
+        for cart_item in cart_items:
+            OrderItem.objects.create(
+                order=order,
+                product=cart_item.product,
+                quantity=cart_item.quantity,
+                price=cart_item.product.price,
             )
 
-            for cart_item in cart_items:
-                OrderItem.objects.create(
-                    order=order,
-                    product=cart_item.product,
-                    quantity=cart_item.quantity,
-                    price=cart_item.product.price,
-                )
+        if promo:
+            PromoCode.objects.filter(id=promo_code_id).update(
+                current_uses=db_models.F("current_uses") + 1
+            )
 
-            return order
-    except (OrderItem.DoesNotExist, Order.DoesNotExist):
-        raise
+        return order
 
 
 @sync_to_async
-def get_order_by_id(order_id: str) -> Order:
+def get_order_by_id(order_id: str) -> Order | None:
     return Order.objects.filter(id=order_id).first()
 
 

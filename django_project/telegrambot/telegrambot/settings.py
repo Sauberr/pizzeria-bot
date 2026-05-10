@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-from typing import Any, Dict, List
 
 from django.utils.translation import gettext_lazy as _
 
@@ -24,15 +23,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY: str = "django-insecure-weofoh$wr!iv%bbmn1v7ulcvnkt=*oewffbs%!!owa_(5$ch1-"
+SECRET_KEY: str = db_config.DJANGO_SECRET_KEY
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG: bool = True
+DEBUG: bool = db_config.DJANGO_DEBUG
 
-ALLOWED_HOSTS: List = ["localhost", "127.0.0.1", "*"]
+ALLOWED_HOSTS: list = ["localhost", "127.0.0.1", "0.0.0.0"]
 
-INTERNAL_IPS: List[str] = [
+INTERNAL_IPS: list[str] = [
     "127.0.0.1",
     "localhost",
 ]
@@ -40,7 +37,7 @@ INTERNAL_IPS: List[str] = [
 
 # Application definition
 
-INSTALLED_APPS: List[str] = [
+INSTALLED_APPS: list[str] = [
     "jazzmin",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -53,7 +50,7 @@ INSTALLED_APPS: List[str] = [
     "parler",
 ]
 
-MIDDLEWARE: List[str] = [
+MIDDLEWARE: list[str] = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -65,7 +62,7 @@ MIDDLEWARE: List[str] = [
 
 ROOT_URLCONF: str = "django_project.telegrambot.telegrambot.urls"
 
-TEMPLATES: List[Dict[str, str]] = [
+TEMPLATES: list[dict[str, str]] = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [],
@@ -120,7 +117,7 @@ AUTH_USER_MODEL = "usersmanage.AdminUser"
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
-AUTH_PASSWORD_VALIDATORS: List[dict[str, str]] = [
+AUTH_PASSWORD_VALIDATORS: list[dict[str, str]] = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
@@ -166,7 +163,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD: str = "django.db.models.BigAutoField"
 
 
-JAZZMIN_SETTINGS: Dict[str, ...] = {
+JAZZMIN_SETTINGS: dict[str, str] = {
     "site_title": "Telegram Bot Admin",
     "site_header": "Admin Panel",
     "site_brand": "Telegram Bot",
