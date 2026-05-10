@@ -72,7 +72,7 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 ### 👤 For Users
 * Intuitive catalog browsing with navigation and pagination
 * Payment via Telegram Pay and cryptocurrency payments
-* **Promo code support** — enter a code at checkout to get a percentage discount; the bot validates it and shows the original price, discount amount, and new total before payment
+* Promo code support — enter a code at checkout to get a percentage discount; the bot validates it and shows the original price, discount amount, and new total before payment
 * Easy order placement and order history viewing
 * User profile with personal information and preferences
 * Shopping cart functionality with quantity management
