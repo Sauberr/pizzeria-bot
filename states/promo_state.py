@@ -7,5 +7,3 @@ class AddPromoCode(StatesGroup):
     valid_from = State()
     valid_until = State()
     max_uses = State()
-
-    promo_for_change = None

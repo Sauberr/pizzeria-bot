@@ -28,7 +28,7 @@ def add_order(
             user=user, name=name, phone=phone, address=address, status=status
         )
         return order
-    except Order.DoesNotExist:
+    except TelegramUser.DoesNotExist:
         return None
 
 

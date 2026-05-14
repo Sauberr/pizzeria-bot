@@ -24,9 +24,9 @@ from keybords.reply.admin_keyboard import get_admin_keyboard
 from queries.banner_queries import change_banner_image, get_info_pages
 from queries.category_queries import get_categories
 from queries.order_queries import total_orders
-from queries.products_queries import (add_product, delete_product, get_product,
-                                      get_products, total_products,
-                                      total_products_by_category,
+from queries.products_queries import (add_product, delete_product,
+                                      get_product_for_edit, get_products,
+                                      total_products, total_products_by_category,
                                       update_product)
 from queries.promo_queries import (create_promo_code, delete_promo_code_by_id,
                                    get_all_promo_codes, get_promo_by_id,
@@ -164,11 +164,8 @@ async def add_banner(message: types.Message, state: FSMContext, i18n: Translator
 
     try:
         save_path = await download_telegram_photo(message, "banners", for_page)
-
         await change_banner_image(for_page, save_path)
-
         await message.answer(i18n.admin_banner_success())
-
     except (FileNotFoundError, AttributeError, OSError, TypeError):
         await message.answer(i18n.admin_banner_error())
         return
@@ -187,11 +184,6 @@ async def not_correct_add_banner(
 async def cancel_handler(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ) -> None:
-    if AddProduct.product_for_change:
-        AddProduct.product_for_change = None
-    if AddPromoCode.promo_for_change:
-        AddPromoCode.promo_for_change = None
-
     await state.clear()
     admin_kb = get_admin_keyboard(i18n)
     await message.answer(i18n.admin_canceled(), reply_markup=admin_kb)
@@ -222,10 +214,13 @@ async def edit_product_callback(
     callback: types.CallbackQuery, state: FSMContext, i18n: TranslatorRunner
 ):
     product_id = callback.data.split("_")[-1]
-    product_for_change = await get_product(int(product_id))
+    product_snapshot = await get_product_for_edit(int(product_id))
 
-    AddProduct.product_for_change = product_for_change
+    if not product_snapshot:
+        await callback.answer()
+        return
 
+    await state.update_data(product_snapshot=product_snapshot)
     await callback.answer()
     await callback.message.answer(
         i18n.admin_product_edit_name(),
@@ -236,6 +231,7 @@ async def edit_product_callback(
 
 @admin_router.message(StateFilter(None), TranslatedText("admin_add_good"))
 async def get_add_product(message: types.Message, state: FSMContext, i18n: TranslatorRunner):
+    await state.update_data(product_snapshot=None)
     await message.answer(
         i18n.admin_product_add_en_name(),
         reply_markup=ReplyKeyboardRemove(),
@@ -246,7 +242,9 @@ async def get_add_product(message: types.Message, state: FSMContext, i18n: Trans
 @admin_router.message(AddProduct.en_name, or_f(F.text, F.text == "."))
 async def add_en_name(message: types.Message, state: FSMContext, i18n: TranslatorRunner):
     if message.text == ".":
-        await state.update_data(en_name=AddProduct.product_for_change.name_en if AddProduct.product_for_change else "")
+        data = await state.get_data()
+        snapshot = data.get("product_snapshot")
+        await state.update_data(en_name=snapshot["name_en"] if snapshot else "")
     else:
         if not (4 <= len(message.text) <= 100):
             await message.answer(i18n.admin_product_name_error())
@@ -265,7 +263,9 @@ async def not_correct_add_en_name(message: types.Message, i18n: TranslatorRunner
 @admin_router.message(AddProduct.ru_name, or_f(F.text, F.text == "."))
 async def add_ru_name(message: types.Message, state: FSMContext, i18n: TranslatorRunner):
     if message.text == ".":
-        await state.update_data(ru_name=AddProduct.product_for_change.name_ru if AddProduct.product_for_change else "")
+        data = await state.get_data()
+        snapshot = data.get("product_snapshot")
+        await state.update_data(ru_name=snapshot["name_ru"] if snapshot else "")
     else:
         if not (4 <= len(message.text) <= 100):
             await message.answer(i18n.admin_product_name_error())
@@ -283,8 +283,14 @@ async def not_correct_add_ru_name(message: types.Message, i18n: TranslatorRunner
 
 @admin_router.message(AddProduct.en_description, F.text)
 async def add_en_description(message: types.Message, state: FSMContext, i18n: TranslatorRunner):
-    if message.text == "." and AddProduct.product_for_change:
-        await state.update_data(en_description=AddProduct.product_for_change.description_en)
+    if message.text == ".":
+        data = await state.get_data()
+        snapshot = data.get("product_snapshot")
+        if snapshot:
+            await state.update_data(en_description=snapshot["description_en"])
+        else:
+            await message.answer(i18n.admin_product_description_error())
+            return
     else:
         if not (4 <= len(message.text) <= 1000):
             await message.answer(i18n.admin_product_description_error())
@@ -302,8 +308,14 @@ async def not_correct_add_en_description(message: types.Message, i18n: Translato
 
 @admin_router.message(AddProduct.ru_description, F.text)
 async def add_ru_description(message: types.Message, state: FSMContext, i18n: TranslatorRunner):
-    if message.text == "." and AddProduct.product_for_change:
-        await state.update_data(ru_description=AddProduct.product_for_change.description_ru)
+    if message.text == ".":
+        data = await state.get_data()
+        snapshot = data.get("product_snapshot")
+        if snapshot:
+            await state.update_data(ru_description=snapshot["description_ru"])
+        else:
+            await message.answer(i18n.admin_product_description_error())
+            return
     else:
         if not (4 <= len(message.text) <= 1000):
             await message.answer(i18n.admin_product_description_error())
@@ -340,8 +352,14 @@ async def not_correct_category_choice(message: types.Message, i18n: TranslatorRu
 
 @admin_router.message(AddProduct.price)
 async def add_price(message: types.Message, state: FSMContext, i18n: TranslatorRunner):
-    if message.text == "." and AddProduct.product_for_change:
-        await state.update_data(price=AddProduct.product_for_change.price)
+    if message.text == ".":
+        data = await state.get_data()
+        snapshot = data.get("product_snapshot")
+        if snapshot:
+            await state.update_data(price=snapshot["price"])
+        else:
+            await message.answer(i18n.admin_price_error())
+            return
     else:
         try:
             float(message.text)
@@ -362,12 +380,17 @@ async def not_correct_add_price(message: types.Message, i18n: TranslatorRunner):
 @admin_router.message(AddProduct.image, or_f(F.photo, F.text == "."))
 async def add_image(message: types.Message, state: FSMContext, i18n: TranslatorRunner) -> None:
     try:
-        if message.text == "." and AddProduct.product_for_change:
-            await state.update_data(
-                image=(AddProduct.product_for_change.image.name if AddProduct.product_for_change.image else None)
-            )
+        data = await state.get_data()
+        snapshot = data.get("product_snapshot")
+
+        if message.text == ".":
+            if snapshot:
+                await state.update_data(image=snapshot["image_name"])
+            else:
+                await message.answer(i18n.admin_image_keep_current())
+                return
         elif message.photo:
-            file_name = f"product_{int(datetime.now().timestamp())}"
+            file_name = f"product_{int(timezone.now().timestamp())}"
             save_path = await download_telegram_photo(message, "products", file_name)
             await state.update_data(image=save_path)
         else:
@@ -376,25 +399,23 @@ async def add_image(message: types.Message, state: FSMContext, i18n: TranslatorR
 
         data = await state.get_data()
 
-        if AddProduct.product_for_change:
-            if message.photo and AddProduct.product_for_change.image:
-                old_image_path = AddProduct.product_for_change.image.path
+        if snapshot:
+            if message.photo and snapshot["image_path"]:
+                old_image_path = snapshot["image_path"]
                 if os.path.exists(old_image_path):
                     os.remove(old_image_path)
-            await update_product(AddProduct.product_for_change.id, data)
+            await update_product(snapshot["id"], data)
         else:
             await add_product(data)
 
         admin_kb = get_admin_keyboard(i18n)
         await message.answer(i18n.admin_product_success(), reply_markup=admin_kb)
         await state.clear()
-        AddProduct.product_for_change = None
 
     except (FileNotFoundError, AttributeError, OSError, TypeError):
         admin_kb = get_admin_keyboard(i18n)
         await message.answer(i18n.admin_product_error(), reply_markup=admin_kb)
         await state.clear()
-        AddProduct.product_for_change = None
 
 
 @admin_router.message(AddProduct.image)
@@ -417,7 +438,7 @@ async def process_newsletter(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ):
     users = await sync_to_async(list)(TelegramUser.objects.all())
-    start_time = datetime.now()
+    start_time = timezone.now()
     success_count = 0
     error_count = 0
     for user in users:
@@ -430,7 +451,7 @@ async def process_newsletter(
             error_count += 1
             continue
 
-    time_taken = (datetime.now() - start_time).total_seconds()
+    time_taken = (timezone.now() - start_time).total_seconds()
     await message.answer(
         i18n.admin_newsletter_success(
             success_count=success_count,
@@ -518,7 +539,7 @@ async def delete_promo(
 async def start_add_promo(
     callback: CallbackQuery, state: FSMContext, i18n: TranslatorRunner
 ) -> None:
-    AddPromoCode.promo_for_change = None
+    await state.update_data(promo_snapshot=None)
     await callback.answer()
     await callback.message.answer(i18n.admin_promo_enter_code())
     await state.set_state(AddPromoCode.code)
@@ -536,7 +557,15 @@ async def start_edit_promo(
         await callback.answer(i18n.admin_promo_not_found(), show_alert=True)
         return
 
-    AddPromoCode.promo_for_change = promo
+    promo_snapshot = {
+        "id": promo.id,
+        "code": promo.code,
+        "discount_percent": float(promo.discount_percent),
+        "valid_from": promo.valid_from.isoformat(),
+        "valid_until": promo.valid_until.isoformat(),
+        "max_uses": promo.max_uses,
+    }
+    await state.update_data(promo_snapshot=promo_snapshot)
     await callback.answer()
     await callback.message.answer(i18n.admin_promo_edit_hint(current=promo.code))
     await state.set_state(AddPromoCode.code)
@@ -546,8 +575,15 @@ async def start_edit_promo(
 async def promo_fsm_code(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ) -> None:
-    if message.text == "." and AddPromoCode.promo_for_change:
-        await state.update_data(code=AddPromoCode.promo_for_change.code)
+    data = await state.get_data()
+    snapshot = data.get("promo_snapshot")
+
+    if message.text == ".":
+        if snapshot:
+            await state.update_data(code=snapshot["code"])
+        else:
+            await message.answer(i18n.admin_promo_code_length_error())
+            return
     else:
         code = message.text.strip().upper()
         if not (2 <= len(code) <= 50):
@@ -555,8 +591,7 @@ async def promo_fsm_code(
             return
         await state.update_data(code=code)
 
-    cur = AddPromoCode.promo_for_change
-    hint = f" ({cur.discount_percent}%)" if cur else ""
+    hint = f" ({snapshot['discount_percent']}%)" if snapshot else ""
     await message.answer(i18n.admin_promo_enter_discount(hint=hint))
     await state.set_state(AddPromoCode.discount_percent)
 
@@ -570,10 +605,15 @@ async def promo_fsm_code_wrong(message: types.Message, i18n: TranslatorRunner) -
 async def promo_fsm_discount(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ) -> None:
-    if message.text == "." and AddPromoCode.promo_for_change:
-        await state.update_data(
-            discount_percent=float(AddPromoCode.promo_for_change.discount_percent)
-        )
+    data = await state.get_data()
+    snapshot = data.get("promo_snapshot")
+
+    if message.text == ".":
+        if snapshot:
+            await state.update_data(discount_percent=snapshot["discount_percent"])
+        else:
+            await message.answer(i18n.admin_promo_discount_error())
+            return
     else:
         try:
             val = float(message.text.replace(",", "."))
@@ -584,8 +624,11 @@ async def promo_fsm_discount(
             await message.answer(i18n.admin_promo_discount_error())
             return
 
-    cur = AddPromoCode.promo_for_change
-    hint = f" ({cur.valid_from.strftime('%d.%m.%Y')})" if cur else ""
+    if snapshot:
+        valid_from_dt = datetime.fromisoformat(snapshot["valid_from"])
+        hint = f" ({valid_from_dt.strftime('%d.%m.%Y')})"
+    else:
+        hint = ""
     await message.answer(i18n.admin_promo_enter_valid_from(hint=hint))
     await state.set_state(AddPromoCode.valid_from)
 
@@ -599,10 +642,15 @@ async def promo_fsm_discount_wrong(message: types.Message, i18n: TranslatorRunne
 async def promo_fsm_valid_from(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ) -> None:
-    if message.text == "." and AddPromoCode.promo_for_change:
-        await state.update_data(
-            valid_from=AddPromoCode.promo_for_change.valid_from.isoformat()
-        )
+    data = await state.get_data()
+    snapshot = data.get("promo_snapshot")
+
+    if message.text == ".":
+        if snapshot:
+            await state.update_data(valid_from=snapshot["valid_from"])
+        else:
+            await message.answer(i18n.admin_promo_date_error())
+            return
     else:
         try:
             dt = datetime.strptime(message.text.strip(), "%d.%m.%Y")
@@ -612,8 +660,11 @@ async def promo_fsm_valid_from(
             await message.answer(i18n.admin_promo_date_error())
             return
 
-    cur = AddPromoCode.promo_for_change
-    hint = f" ({cur.valid_until.strftime('%d.%m.%Y')})" if cur else ""
+    if snapshot:
+        valid_until_dt = datetime.fromisoformat(snapshot["valid_until"])
+        hint = f" ({valid_until_dt.strftime('%d.%m.%Y')})"
+    else:
+        hint = ""
     await message.answer(i18n.admin_promo_enter_valid_until(hint=hint))
     await state.set_state(AddPromoCode.valid_until)
 
@@ -627,10 +678,15 @@ async def promo_fsm_valid_from_wrong(message: types.Message, i18n: TranslatorRun
 async def promo_fsm_valid_until(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ) -> None:
-    if message.text == "." and AddPromoCode.promo_for_change:
-        await state.update_data(
-            valid_until=AddPromoCode.promo_for_change.valid_until.isoformat()
-        )
+    data = await state.get_data()
+    snapshot = data.get("promo_snapshot")
+
+    if message.text == ".":
+        if snapshot:
+            await state.update_data(valid_until=snapshot["valid_until"])
+        else:
+            await message.answer(i18n.admin_promo_date_error())
+            return
     else:
         try:
             dt = datetime.strptime(message.text.strip(), "%d.%m.%Y")
@@ -640,8 +696,7 @@ async def promo_fsm_valid_until(
             await message.answer(i18n.admin_promo_date_error())
             return
 
-    cur = AddPromoCode.promo_for_change
-    hint = f" ({cur.max_uses or '∞'})" if cur else ""
+    hint = f" ({snapshot['max_uses'] or '∞'})" if snapshot else ""
     await message.answer(i18n.admin_promo_enter_max_uses(hint=hint))
     await state.set_state(AddPromoCode.max_uses)
 
@@ -656,9 +711,14 @@ async def promo_fsm_max_uses(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ) -> None:
     data = await state.get_data()
+    snapshot = data.get("promo_snapshot")
 
-    if message.text == "." and AddPromoCode.promo_for_change:
-        max_uses = AddPromoCode.promo_for_change.max_uses
+    if message.text == ".":
+        if snapshot:
+            max_uses = snapshot["max_uses"]
+        else:
+            await message.answer(i18n.admin_promo_max_uses_error())
+            return
     else:
         try:
             val = int(message.text.strip())
@@ -687,19 +747,17 @@ async def promo_fsm_max_uses(
     }
 
     try:
-        if AddPromoCode.promo_for_change:
-            await update_promo_code(AddPromoCode.promo_for_change.id, promo_data)
+        if snapshot:
+            await update_promo_code(snapshot["id"], promo_data)
             result_text = i18n.admin_promo_updated()
         else:
             await create_promo_code(promo_data)
             result_text = i18n.admin_promo_created()
     except Exception:
         await message.answer(i18n.admin_promo_save_error())
-        AddPromoCode.promo_for_change = None
         await state.clear()
         return
 
-    AddPromoCode.promo_for_change = None
     await state.clear()
     await message.answer(result_text, reply_markup=get_admin_keyboard(i18n))
 

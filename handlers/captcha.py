@@ -1,6 +1,5 @@
 import random
 from datetime import timedelta
-from typing import Any
 
 from aiogram import Router, types
 from aiogram.filters import CommandStart
@@ -14,8 +13,8 @@ from fluentogram import TranslatorRunner
 from django_project.telegrambot.usersmanage.models import CaptchaRecord
 from filters.chat_types import ChatTypeFilter
 from handlers.check_subscription import CheckSubscription
-from keybords.inline.subscription_keyboard import get_subscription_keyboard
 from handlers.start_cmd import start_cmd
+from keybords.inline.subscription_keyboard import get_subscription_keyboard
 from queries.captcha_queries import mark_captcha_passed
 from queries.user_queries import get_user
 from states.registration_state import RegistrationStates
@@ -36,25 +35,19 @@ WORDS_TO_EMOJI: dict[str, str] = {word: emoji for word, emoji in CAPTCHA_OPTIONS
 EMOJI_LIST: list[str] = [emoji for _, emoji in CAPTCHA_OPTIONS]
 WORDS_LIST: list[str] = [word for word, _ in CAPTCHA_OPTIONS]
 
-user_captcha_data: dict[int, dict[str, Any]] = {}
-
 
 class CaptchaManager:
     @staticmethod
     async def has_passed_recently(user_id: int) -> bool:
-        try:
-            time_expiration = timezone.now() - timedelta(weeks=2)
-            user = await get_user(user_id)
-            if not user:
-                return False
-
-            return await sync_to_async(
-                lambda: CaptchaRecord.objects.filter(
-                    user=user, timestamp__gt=time_expiration
-                ).exists()
-            )()
-        except CaptchaRecord.DoesNotExist:
+        time_expiration = timezone.now() - timedelta(weeks=2)
+        user = await get_user(user_id)
+        if not user:
             return False
+        return await sync_to_async(
+            lambda: CaptchaRecord.objects.filter(
+                user=user, timestamp__gt=time_expiration
+            ).exists()
+        )()
 
     @staticmethod
     def generate_captcha() -> tuple[str, str, InlineKeyboardMarkup]:
@@ -79,15 +72,10 @@ class CaptchaManager:
 
     @staticmethod
     async def send_new_captcha(
-        message: Message, user_id: int, i18n: TranslatorRunner
+        message: Message, user_id: int, state: FSMContext, i18n: TranslatorRunner
     ) -> None:
         word, emoji, keyboard = CaptchaManager.generate_captcha()
-
-        user_captcha_data[user_id] = {
-            "word": word,
-            "correct_emoji": emoji,
-        }
-
+        await state.update_data(captcha_word=word, captcha_emoji=emoji)
         await message.answer(
             CaptchaManager.get_captcha_text(word, i18n),
             reply_markup=keyboard,
@@ -96,15 +84,10 @@ class CaptchaManager:
 
     @staticmethod
     async def regenerate_captcha(
-        callback: types.CallbackQuery, user_id: int, i18n: TranslatorRunner
+        callback: types.CallbackQuery, state: FSMContext, i18n: TranslatorRunner
     ) -> None:
         word, emoji, keyboard = CaptchaManager.generate_captcha()
-
-        user_captcha_data[user_id] = {
-            "word": word,
-            "correct_emoji": emoji,
-        }
-
+        await state.update_data(captcha_word=word, captcha_emoji=emoji)
         await callback.message.edit_text(
             CaptchaManager.get_captcha_text(word, i18n),
             reply_markup=keyboard,
@@ -113,13 +96,15 @@ class CaptchaManager:
 
 
 async def handle_successful_captcha(
-    callback: CallbackQuery, state: FSMContext, user_id: int, i18n: TranslatorRunner, user_language: str = "en"
+    callback: CallbackQuery,
+    state: FSMContext,
+    user_id: int,
+    i18n: TranslatorRunner,
+    user_language: str = "en",
 ) -> None:
     await callback.answer(i18n.captcha_success())
     await callback.message.delete()
-
-    if user_id in user_captcha_data:
-        del user_captcha_data[user_id]
+    await state.update_data(captcha_word=None, captcha_emoji=None)
 
     user = await get_user(user_id)
     if user and user.phone_number:
@@ -140,7 +125,12 @@ async def handle_successful_captcha(
 
 
 @captcha_router.message(CommandStart())
-async def captcha_cmd(message: types.Message, i18n: TranslatorRunner, user_language: str = "en"):
+async def captcha_cmd(
+    message: types.Message,
+    state: FSMContext,
+    i18n: TranslatorRunner,
+    user_language: str = "en",
+):
     user_id = message.from_user.id
     user = await get_user(user_id)
 
@@ -157,30 +147,35 @@ async def captcha_cmd(message: types.Message, i18n: TranslatorRunner, user_langu
                 reply_markup=get_subscription_keyboard(i18n),
             )
     else:
-        await CaptchaManager.send_new_captcha(message, user_id, i18n)
+        await CaptchaManager.send_new_captcha(message, user_id, state, i18n)
 
 
 @captcha_router.callback_query(lambda c: c.data in EMOJI_LIST)
 async def process_captcha_callback(
-    callback: types.CallbackQuery, state: FSMContext, i18n: TranslatorRunner, user_language: str = "en"
+    callback: types.CallbackQuery,
+    state: FSMContext,
+    i18n: TranslatorRunner,
+    user_language: str = "en",
 ):
     user_id = callback.from_user.id
     selected_emoji = callback.data
 
-    if user_id not in user_captcha_data:
+    fsm_data = await state.get_data()
+    correct_emoji = fsm_data.get("captcha_emoji")
+
+    if not correct_emoji:
         await callback.answer(i18n.captcha_expired())
         await callback.message.delete()
         return
 
-    correct_emoji = user_captcha_data[user_id]["correct_emoji"]
     if selected_emoji == correct_emoji:
         try:
             if await mark_captcha_passed(user_id, selected_emoji):
                 await handle_successful_captcha(callback, state, user_id, i18n, user_language)
             else:
                 await callback.answer(i18n.captcha_save_error())
-        except CaptchaRecord.DoesNotExist:
+        except Exception:
             await callback.answer(i18n.captcha_general_error())
     else:
         await callback.answer(i18n.captcha_wrong_selection())
-        await CaptchaManager.regenerate_captcha(callback, user_id, i18n)
+        await CaptchaManager.regenerate_captcha(callback, state, i18n)

@@ -2,9 +2,8 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Union
-
-from parler.utils.context import switch_language
 
 from aiogram import F, Router, types
 from aiogram.filters import Command
@@ -12,9 +11,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, KeyboardButton, LabeledPrice,
                            Message, ReplyKeyboardMarkup, ReplyKeyboardRemove)
+from django.utils import timezone
 from fluentogram import TranslatorRunner
+from parler.utils.context import switch_language
 
 from app import crypto_client
+from app_config import STAR_TO_USD_RATE, env_config
 from callbacks.callbacks import OrderDetailCallBack, MenuCallBack
 from filters.chat_types import ChatTypeFilter
 from handlers.payment import CryptoApiManager
@@ -124,16 +126,16 @@ async def _show_order_confirmation(
 ) -> None:
     user_data = await state.get_data()
     cart_items = await get_cart_items(message.from_user.id)
-    total_usd = sum(float(item.product.price) * item.quantity for item in cart_items)
+    total_usd = sum(item.product.price * item.quantity for item in cart_items)
 
-    discount_percent = user_data.get("discount_percent", 0)
+    discount_percent = Decimal(str(user_data.get("discount_percent", 0)))
     promo_code_str = user_data.get("promo_code_str")
 
     if discount_percent:
         discount_usd = total_usd * discount_percent / 100
         discounted_usd = total_usd - discount_usd
     else:
-        discount_usd = 0.0
+        discount_usd = Decimal("0")
         discounted_usd = total_usd
 
     total_amount, currency = await convert_currency(discounted_usd, user_language)
@@ -268,7 +270,7 @@ async def process_crypto_payment(
             await callback.answer(i18n.invalid_payment_response(), show_alert=True)
             return
 
-        expiration_time = datetime.now() + timedelta(minutes=3)
+        expiration_time = timezone.now() + timedelta(minutes=3)
 
         try:
             await state.update_data(
@@ -339,13 +341,12 @@ async def handle_star_payment(
         user_data = await state.get_data()
         amount_usd = user_data["amount_usd"]
 
-        star_rate = 0.0187
-        stars_amount = int(float(amount_usd) / star_rate)
+        stars_amount = int(float(amount_usd) / STAR_TO_USD_RATE)
 
         kb = get_star_payment_keyboard(stars_amount, i18n)
 
         prices = [LabeledPrice(label="XTR", amount=stars_amount)]
-        expiration_time = datetime.now() + timedelta(minutes=3)
+        expiration_time = timezone.now() + timedelta(minutes=3)
         payload = f"{amount_usd}_{stars_amount}_{expiration_time.strftime('%Y-%m-%d %H:%M:%S')}"
 
         await callback.bot.send_invoice(
@@ -353,7 +354,7 @@ async def handle_star_payment(
             title=i18n.order_payment_title(),
             description=i18n.star_payment_description(stars_amount=stars_amount),
             prices=prices,
-            provider_token=os.getenv("STAR_PAYMENT_TOKEN"),
+            provider_token=env_config.STAR_PAYMENT_TOKEN,
             payload=payload,
             currency="XTR",
             protect_content=False,
@@ -377,7 +378,7 @@ async def check_payment(
     user_language: str,
     expiration_time: datetime,
 ):
-    while datetime.now() < expiration_time:
+    while timezone.now() < expiration_time:
         try:
             invoices = await crypto_client.get_invoices(invoice_ids=[invoice_id])
             if invoices and invoices[0].status == "paid":
@@ -579,7 +580,7 @@ async def process_order_detail(
             await callback.answer(i18n.order_no_products(), show_alert=True)
             return
 
-        total_sum_usd = sum(float(item.price) * item.quantity for item in items)
+        total_sum_usd = sum(item.price * item.quantity for item in items)
         total_sum, currency = await convert_currency(total_sum_usd, user_language)
 
         item_details_list = []
@@ -587,7 +588,7 @@ async def process_order_detail(
             with switch_language(item.product, user_language):
                 item_name = item.product.name
             item_price, item_currency = await convert_currency(
-                float(item.price), user_language
+                item.price, user_language
             )
             item_details_list.append(
                 i18n.order_detail_item(

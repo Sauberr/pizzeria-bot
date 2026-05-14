@@ -35,7 +35,7 @@ async def start_registration(
     user_id = message.from_user.id
 
     if not await CaptchaManager.has_passed_recently(user_id):
-        await CaptchaManager.send_new_captcha(message, user_id, i18n)
+        await CaptchaManager.send_new_captcha(message, user_id, state, i18n)
         return
 
     user = await get_user(user_id)
@@ -50,7 +50,7 @@ async def start_registration(
 async def process_first_name(
     message: types.Message, state: FSMContext, i18n: TranslatorRunner
 ):
-    if len(message.text) > 30:
+    if not message.text or len(message.text) > 30:
         await message.answer(i18n.name_too_long())
         return
 

@@ -26,7 +26,9 @@ class AdminUserAdmin(admin.ModelAdmin):
 @admin.register(Banner)
 class BannerAdmin(TranslatableAdmin):
     def thumbnail(self, object):
-        return format_html('<img src="{}" width="100";" />'.format(object.image.url))
+        if object.image:
+            return format_html('<img src="{}" width="100" />', object.image.url)
+        return "No image"
 
     list_display = (
         "id",

@@ -1,14 +1,17 @@
+from decimal import Decimal
 from typing import Optional
 
 from asgiref.sync import sync_to_async
 from django.db.models import Count
+from parler.utils.context import switch_language
+
 from django_project.telegrambot.usersmanage.models import Category, Product
 
 
 @sync_to_async
 def add_product(data: dict) -> None:
     product = Product.objects.create(
-        price=float(data["price"]),
+        price=Decimal(str(data["price"])),
         image=data.get("image"),
         category_id=int(data["category"]),
     )
@@ -35,11 +38,10 @@ def add_product(data: dict) -> None:
 @sync_to_async
 def get_products(category_id: Optional[int] = None) -> list[Product]:
     try:
+        qs = Product.objects.prefetch_related("translations")
         if category_id is not None:
-            products = Product.objects.filter(category_id=int(category_id))
-        else:
-            products = Product.objects.all()
-        return list(products)
+            qs = qs.filter(category_id=int(category_id))
+        return list(qs)
     except Product.DoesNotExist:
         return []
 
@@ -53,7 +55,7 @@ def get_product(product_id: int) -> Optional[Product]:
 def update_product(product_id: int, data: dict) -> None:
     product = Product.objects.get(id=product_id)
 
-    product.price = float(data["price"])
+    product.price = Decimal(str(data["price"]))
     if "image" in data:
         product.image = data["image"]
     product.category_id = int(data["category"])
@@ -104,3 +106,22 @@ def total_products_by_category() -> dict[str, int]:
         cat.name: cat.product_count
         for cat in Category.objects.annotate(product_count=Count("products"))
     }
+
+
+@sync_to_async
+def get_product_for_edit(product_id: int) -> dict | None:
+    try:
+        product = Product.objects.prefetch_related("translations").get(id=product_id)
+        result: dict = {
+            "id": product.id,
+            "price": str(product.price),
+            "image_name": product.image.name if product.image else None,
+            "image_path": str(product.image.path) if product.image else None,
+        }
+        for lang in ("en", "ru"):
+            with switch_language(product, lang):
+                result[f"name_{lang}"] = product.name or ""
+                result[f"description_{lang}"] = product.description or ""
+        return result
+    except Product.DoesNotExist:
+        return None

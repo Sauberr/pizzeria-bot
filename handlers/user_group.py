@@ -75,7 +75,7 @@ async def clear_group(message: types.Message, bot: Bot, i18n: TranslatorRunner) 
 @user_group_router.edited_message()
 @user_group_router.message()
 async def cleaner(message: types.Message, i18n: TranslatorRunner) -> None:
-    if restricted_words.intersection(clean_text(message.text.lower()).split()):
+    if message.text and restricted_words.intersection(clean_text(message.text.lower()).split()):
         first_name = message.from_user.first_name or ""
         last_name = message.from_user.last_name or ""
         full_name = f"{first_name} {last_name}"

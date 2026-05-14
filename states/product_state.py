@@ -10,8 +10,6 @@ class AddProduct(StatesGroup):
     price: float = State()
     image = State()
 
-    product_for_change = None
-
     texts = {
         "AddProduct:en_name": "Enter the English name of the product you want to add:",
         "AddProduct:ru_name": "Enter the Russian name of the product you want to add:",

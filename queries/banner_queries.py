@@ -16,7 +16,7 @@ def add_banner_description(data: dict) -> None:
 
 
 @sync_to_async
-def change_banner_image(name: str, image: str) -> Banner:
+def change_banner_image(name: str, image: str) -> int:
     return Banner.objects.filter(name=name).update(image=image)
 
 

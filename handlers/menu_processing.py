@@ -133,7 +133,7 @@ async def carts(
         cart_price = cart.quantity * converted_product_price
         formatted_cart_price = format_price(cart_price, currency_symbol)
 
-        total_usd = sum(float(c.product.price) * c.quantity for c in carts)
+        total_usd = sum(c.product.price * c.quantity for c in carts)
         total_price, _ = await convert_currency(total_usd, user_language)
         formatted_total_price = format_price(total_price, currency_symbol)
 

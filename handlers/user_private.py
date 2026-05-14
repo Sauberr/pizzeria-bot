@@ -41,7 +41,7 @@ async def process_menu_command(
             )
             if isinstance(update, CallbackQuery):
                 await update.answer(i18n.complete_captcha_first(), show_alert=True)
-            await CaptchaManager.send_new_captcha(target_message, user_id, i18n)
+            await CaptchaManager.send_new_captcha(target_message, user_id, state, i18n)
             return
 
         if isinstance(update, CallbackQuery):

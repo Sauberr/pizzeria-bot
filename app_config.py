@@ -66,3 +66,5 @@ class DatabaseConfig(BaseSettings):
 
 
 db_config = DatabaseConfig()
+
+STAR_TO_USD_RATE: float = 0.0187
