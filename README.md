@@ -62,7 +62,7 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 ### 👨‍💼 For Administrators
 * Advanced admin panel accessible via Telegram and Django Admin
 * CRUD operations for managing products, categories, and banners
-* **Promo code management** — create, edit, delete and toggle codes directly in the bot
+* Promo code management — create, edit, delete and toggle codes directly in the bot
 * Sales and activity statistics with detailed analytics
 * User management and order monitoring
 * Sending notifications and messages to users
@@ -72,7 +72,7 @@ Additionally, Docker is implemented for easy deployment and scalability, allowin
 ### 👤 For Users
 * Intuitive catalog browsing with navigation and pagination
 * Payment via Telegram Pay and cryptocurrency payments
-* **Promo code support** — enter a code at checkout to get a percentage discount; the bot validates it and shows the original price, discount amount, and new total before payment
+* Promo code support — enter a code at checkout to get a percentage discount; the bot validates it and shows the original price, discount amount, and new total before payment
 * Easy order placement and order history viewing
 * User profile with personal information and preferences
 * Shopping cart functionality with quantity management
